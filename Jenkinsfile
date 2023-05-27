@@ -24,6 +24,17 @@ pipeline {
                 }
             }
         }
+        stage('Deploy to Artifactory') {
+            steps {
+                // Use the rtMavenRun step to deploy artifacts to Artifactory
+                rtMavenRun(
+                    tool: 'mvn_2',
+                    deployerId: 'MAVEN_DEPLOYER',
+                    pom: 'pom.xml',
+                    goals: 'deploy'
+                )
+            }
+        }
         stage('Publishtheartifacts'){
             steps{
                 rtPublishBuildInfo (
