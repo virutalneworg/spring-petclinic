@@ -1,46 +1,37 @@
-pipeline {
-    agent { label 'build_node' }
-    stages {
+pipeline{
+    agent any
+    stages{
         stage ('Git clone') {
             steps {
                 git url: 'https://github.com/virtualram-rgb/spring-petclinic.git', branch: 'main'
             }
         }
-        stage('artifactory'){
-            steps{
-                rtMavenDeployer (
-                    id: "MAVEN_DEPLOYER" ,
-                    serverId: 'jfrog_instance',
-                    releaseRepo: 'libs-release-local',
-                    snapshotRepo: 'libs-snapshot-local',
-                    deployArtifacts: 'true' 
-                )
-            }
-        }
         stage ('build') {
             steps {
-                withSonarQubeEnv('SONAR_SELF_HOSTED'){
-                    sh 'mvn install sonar:sonar'
-                }
+                sh 'mvn clean package'
             }
         }
-        stage('Deploy to Artifactory') {
+        stage('exec maven'){
+            environment {
+                AZURE_SUBSCRIPTION_ID='${subscriptionid}'
+                AZURE_TENANT_ID='${tenetid}'
+                AZURE_STORAGE_ACCOUNT='storageforjenkinsbuild'
+                CONTAINER_NAME = 'myjob'
+                BLOB_NAME = '${JOB_NAME}'
+            }
             steps {
-                // Use the rtMavenRun step to deploy artifacts to Artifactory
-                rtMavenRun(
-                    tool: 'mvn_2',
-                    deployerId: 'MAVEN_DEPLOYER',
-                    pom: 'pom.xml',
-                    goals: 'deploy'
-                )
-            }
+        withCredentials([usernamePassword(credentialsId: 'azuresp', 
+                        passwordVariable: 'AZURE_CLIENT_SECRET', 
+                        usernameVariable: 'AZURE_CLIENT_ID')]) {
+          sh '''
+            # Login to Azure with ServicePrincipal
+            az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
+            # Execute upload to Azure
+            az storage blob upload --account-name $AZURE_STORAGE_ACCOUNT --container-name myjob --name ${JOB_NAME} --file ${WORKSPACE}/*.war --auth-mode login
+            # Logout from Azure
+            az logout
+          '''   
         }
-        stage('Publishtheartifacts'){
-            steps{
-                rtPublishBuildInfo (
-                    serverId: 'jfrog_instance'
-                )
-            }
         }
     }
 }
