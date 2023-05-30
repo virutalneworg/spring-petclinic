@@ -4,9 +4,8 @@ pipeline {
     AZURE_SUBSCRIPTION_ID='${subscriptionid}'
     AZURE_TENANT_ID='${tenetid}'
     AZURE_STORAGE_ACCOUNT='storageforjenkinsbuild'
-    CONTAINER_NAME = 'myjob'
     BLOB_NAME = '${JOB_NAME}'
-    PACKAGE_PATH = '/home/ubuntu/ps2/spring-petclinic/target/spring-petclinic-3.0.0-SNAPSHOT.jar'
+    PACKAGE_PATH = "${WORKSPACE}/target/*.jar"
   }
   stages {
     stage('Build') {
@@ -20,7 +19,10 @@ pipeline {
                           passwordVariable: 'AZURE_CLIENT_SECRET', 
                           usernameVariable: 'AZURE_CLIENT_ID')]) {
             sh '''
-              az storage blob upload --account-name $AZURE_STORAGE_ACCOUNT --auth-mode login --container-name myjob --name ${JOB_NAME} 
+              echo $container_name
+              # Login to Azure with ServicePrincipal
+              az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
+              az storage blob upload --account-name $AZURE_STORAGE_ACCOUNT --container-name myjob --name '${BLOB_NAME}' --file '${PACKAGE_PATH}' --auth-mode login
             '''
           }
         }
